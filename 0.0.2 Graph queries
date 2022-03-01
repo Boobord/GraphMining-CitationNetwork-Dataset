@@ -1,0 +1,15 @@
+graph.run("match (n:Article) return count(n)").to_data_frame()
+query = """
+MATCH (article:Article)
+RETURN article.year AS year, count(*) AS count
+ORDER BY year
+"""
+by_year = graph.run(query).to_data_frame()
+display(by_year)
+
+%matplotlib inline
+plt.style.use('fivethirtyeight')
+ax = by_year.plot(kind='bar', x='year', y='count', legend=None, figsize=(15,8))
+ax.xaxis.set_label_text("")
+plt.tight_layout()
+plt.show()
