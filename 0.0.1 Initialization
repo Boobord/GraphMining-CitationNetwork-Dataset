@@ -2,7 +2,7 @@ sc = SparkContext.getOrCreate()
 spark = SparkSession(sc)
 
 #create an instance of the Neo4j driver pointing at a local Neo4j database
-#you should import user Name, Pass word and Localhost from your Neo4j acount.
-graph = Graph("bolt://localhost:NUMBER", auth=("YOURUSERNAME", "YOURPASSWORD"))
+#you should import user Name, Password and Localhost from your Neo4j acount.
+graph = Graph("bolt://localhost:NUMBER", auth=("USERNAME", "PASSWORD"))
 type(graph)
 
