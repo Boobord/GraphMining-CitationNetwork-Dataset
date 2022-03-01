@@ -1,0 +1,32 @@
+def evaluate_model(model, test_data):
+	# Execute the model against the test set
+	predictions = model.transform(test_data)
+	# Compute true positive, false positive, false negative counts
+	tp = predictions[(predictions.label == 1) &
+		(predictions.prediction == 1)].count()
+	fp = predictions[(predictions.label == 0) &
+		(predictions.prediction == 1)].count()
+	fn = predictions[(predictions.label == 1) &
+		(predictions.prediction == 0)].count()
+	# Compute recall and precision manually
+	recall = float(tp) / (tp + fn)
+	precision = float(tp) / (tp + fp)
+	# Compute accuracy using Spark MLLib's binary classification evaluator
+	accuracy = BinaryClassificationEvaluator().evaluate(predictions)
+	# Compute false positive rate and true positive rate using sklearn functions
+	labels = [row["label"] for row in predictions.select("label").collect()]
+	preds = [row["probability"][1] for row in predictions.select
+		("probability").collect()]
+	fpr, tpr, threshold = roc_curve(labels, preds)
+	roc_auc = auc(fpr, tpr)
+	return { "fpr": fpr, "tpr": tpr, "roc_auc": roc_auc, "accuracy": accuracy,
+	"recall": recall, "precision": precision }
+  
+  def display_results(results):
+	results = {k: v for k, v in results.items() if k not in
+		["fpr", "tpr", "roc_auc"]}
+	return pd.DataFrame({"Measure": list(results.keys()),
+		"Score": list(results.values())})	
+    
+    basic_results = evaluate_model(basic_model, test_data)
+display_results(basic_results)
