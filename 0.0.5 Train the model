@@ -1,0 +1,17 @@
+def train_model(fields, training_data):
+	pipeline = create_pipeline(fields)
+	model = pipeline.fit(training_data)
+	return model	
+  
+  #creating a basic model that only uses commonAuthors.
+basic_model = train_model(["commonAuthors"], training_data)
+
+eval_df = spark.createDataFrame(
+	[(0,), (1,), (2,), (10,), (100,)],
+	['commonAuthors'])
+(basic_model.transform(eval_df)
+.select("commonAuthors", "probability", "prediction")
+.show(truncate=False))	
+
+
+
