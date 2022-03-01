@@ -1,0 +1,6 @@
+MATCH (a1)<-[:AUTHOR]-(paper)-[:AUTHOR]->(a2:Author)
+WITH a1, a2, paper
+ORDER BY a1, paper.year
+WITH a1, a2, collect(paper)[0].year AS year, count(*) AS collaborations
+MERGE (a1)-[coauthor:CO_AUTHOR {year: year}]-(a2)
+SET coauthor.collaborations = collaborations;
