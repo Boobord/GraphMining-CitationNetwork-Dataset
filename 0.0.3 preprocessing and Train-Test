@@ -1,0 +1,58 @@
+def down_sample(df):
+    copy = df.copy()
+    zero = Counter(copy.label.values)[0]
+    un = Counter(copy.label.values)[1]
+    n = zero - un
+    copy = copy.drop(copy[copy.label == 0].sample(n=n, random_state=1).index)
+    return copy.sample(frac=1)
+    
+    train_existing_links = graph.run("""
+MATCH (author:Author)-[:CO_AUTHOR_EARLY]->(other:Author)
+RETURN id(author) AS node1, id(other) AS node2, 1 AS label
+""").to_data_frame()
+
+#finding not existing links
+# find 2 to 3 hopes around each node (we dont need all relationships in the graph and restricted selected 
+#relationship between 2 and 3 relationship)
+train_missing_links = graph.run("""
+MATCH (author:Author)
+WHERE (author)-[:CO_AUTHOR_EARLY]-()
+MATCH (author)-[:CO_AUTHOR_EARLY*2..3]-(other)
+WHERE not((author)-[:CO_AUTHOR_EARLY]-(other))
+RETURN id(author) AS node1, id(other) AS node2, 0 AS label
+""").to_data_frame()
+train_missing_links
+
+train_missing_links = train_missing_links.drop_duplicates()
+training_df = train_missing_links.append(train_existing_links, ignore_index=True)
+training_df['label'] = training_df['label'].astype('category')
+#make the number of missing labels (0) down to existing label (1)
+training_df = down_sample(training_df)
+training_data = spark.createDataFrame(training_df)
+training_data.show(n=5)
+#the number of existing and missing links are now the same, in training data
+training_data.groupby("label").count().show()
+
+test_existing_links = graph.run("""
+MATCH (author:Author)-[:CO_AUTHOR_LATE]->(other:Author)
+RETURN id(author) AS node1, id(other) AS node2, 1 AS label
+""").to_data_frame()
+
+test_missing_links = graph.run("""
+MATCH (author:Author)
+WHERE (author)-[:CO_AUTHOR_LATE]-()
+MATCH (author)-[:CO_AUTHOR*2..3]-(other)
+WHERE not((author)-[:CO_AUTHOR]-(other))
+RETURN id(author) AS node1, id(other) AS node2, 0 AS label
+""").to_data_frame()
+
+test_missing_links = test_missing_links.drop_duplicates()
+test_df = test_missing_links.append(test_existing_links, ignore_index=True)
+test_df['label'] = test_df['label'].astype('category')
+test_df = down_sample(test_df)
+test_data = spark.createDataFrame(test_df)
+
+test_data.groupby("label").count().show()
+
+
+
