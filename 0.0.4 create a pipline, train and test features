@@ -1,0 +1,65 @@
+def create_pipeline(fields):
+    assembler = VectorAssembler(inputCols=fields, outputCol="features")
+    rf = RandomForestClassifier(labelCol="label", featuresCol="features",
+                                numTrees=30, maxDepth=10)
+    return Pipeline(stages=[assembler, rf])
+    
+   
+def apply_graphy_training_features(data):
+	query = """
+	UNWIND $pairs AS pair
+	MATCH (p1) WHERE id(p1) = pair.node1
+	MATCH (p2) WHERE id(p2) = pair.node2
+	RETURN pair.node1 AS node1,
+	pair.node2 AS node2,
+	size([(p1)-[:CO_AUTHOR_EARLY]-(a)-
+		[:CO_AUTHOR_EARLY]-(p2) | a]) AS commonAuthors,
+	size((p1)-[:CO_AUTHOR_EARLY]-()) * size((p2)-
+		[:CO_AUTHOR_EARLY]-()) AS prefAttachment,
+	size(apoc.coll.toSet(
+		[(p1)-[:CO_AUTHOR_EARLY]-(a) | id(a)] +
+		[(p2)-[:CO_AUTHOR_EARLY]-(a) | id(a)]
+	)) AS totalNeighbors
+	"""
+	pairs = [{"node1": row["node1"], "node2": row["node2"]}
+	for row in data.collect()]
+	features = spark.createDataFrame(graph.run(query,
+	{"pairs": pairs}).to_data_frame())
+	return data.join(features, ["node1", "node2"])	
+  
+  def apply_graphy_test_features(data):
+	query = """
+	UNWIND $pairs AS pair
+	MATCH (p1) WHERE id(p1) = pair.node1
+	MATCH (p2) WHERE id(p2) = pair.node2
+	RETURN pair.node1 AS node1,
+		pair.node2 AS node2,
+		size([(p1)-[:CO_AUTHOR]-(a)-[:CO_AUTHOR]-(p2) | a]) AS commonAuthors,
+		size((p1)-[:CO_AUTHOR]-()) * size((p2)-[:CO_AUTHOR]-())
+		AS prefAttachment,
+		size(apoc.coll.toSet(
+		[(p1)-[:CO_AUTHOR]-(a) | id(a)] + [(p2)-[:CO_AUTHOR]-(a) | id(a)]
+		)) AS totalNeighbors
+		"""
+	pairs = [{"node1": row["node1"], "node2": row["node2"]} for row in data.collect()]
+	features = spark.createDataFrame(graph.run(query, {"pairs": pairs}).to_data_frame())
+	return data.join(features, ["node1", "node2"])
+  
+  training_data = apply_graphy_training_features(training_data)
+test_data = apply_graphy_test_features(test_data)
+
+plt.style.use('fivethirtyeight')
+fig, axs = plt.subplots(1, 2, figsize=(18, 7), sharey=True)
+charts = [(1, "have collaborated"), (0, "haven't collaborated")]
+for index, chart in enumerate(charts):
+	label, title = chart
+	filtered = training_data.filter(training_data["label"] == label)
+	common_authors = filtered.toPandas()["commonAuthors"]
+	histogram = common_authors.value_counts().sort_index()
+	histogram /= float(histogram.sum())
+	histogram.plot(kind="bar", x='Common Authors', color="darkblue",
+		ax=axs[index], title=f"Authors who {title} (label={label})")
+	axs[index].xaxis.set_label_text("Common Authors")
+
+plt.tight_layout()
+plt.show()
